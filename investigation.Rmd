@@ -1,0 +1,153 @@
+---
+title: "Efectos Visuales Posquirúrgicos"
+author: "MSc. Diana Rey - Javier Rey"
+date: "1 de septiembre de 2015"
+output: html_document
+---
+#Descripción estudio
+
+Estudio efectos posquirúrgicos.
+
+#Carga de datos y librerías
+```{r}
+suppressWarnings(suppressMessages(library(dplyr)))
+suppressWarnings(suppressMessages(library(ggplot2)))
+suppressWarnings(suppressMessages(library(corrplot)))
+suppressWarnings(suppressMessages(library(plyr)))
+setwd("C:/Users/jasam/Google Drive/Laboratorios/Datascience/nena")
+data <- read.table("BASE DE DATOS 26 julio 2015.csv", sep = ";", header = TRUE)
+dim(data)
+```
+
+#Efectividad cirugía - con barras
+
+```{r}
+#Cast data
+data$equivesfpostq <- as.numeric(sub(",", ".", data$equivesfpostq, fixed = TRUE))
+data <- arrange(data, equivesfpostq)
+data$pos <- which(data$equivesfpostq >= 0 | data$equivesfpostq < 0)
+data$formula <- as.numeric(data$equivesfpostq) > 0 
+title <- "Defecto Refactivo Posquirúrgico"
+x_lab <- "Pacientes"
+y_lab <- "Equivalente Esférico"
+
+g <- ggplot(data, aes(x = pos, y=equivesfpostq, fill=formula)) 
+g <- g + geom_bar(stat="identity", position="identity") 
+g <- g + geom_hline(yintercept=0) 
+g <- g + labs(title = title, x = x_lab, y = y_lab) 
+g <- g + theme(legend.position="none")
+g
+```
+
+#Efectividad cirugía - con área 
+```{r}
+ggplot(data, aes(x=pos, y=equivesfpostq)) + 
+    geom_area(aes(fill=formula)) +
+    geom_line() +
+    geom_hline(yintercept=0) +
+    labs(title = title, x = x_lab, y = y_lab) +
+    theme(legend.position="none")
+```
+
+#Casos y controles por sexo
+```{r}
+data$sexo <- as.character(data$sexo)
+new_data <- data[,c("sexo", "casocont")]
+new_data$sexo[new_data$sexo == "0"] <- "Masculino" 
+new_data$sexo[new_data$sexo == "1"] <- "Femenino" 
+new_data$casocont[new_data$casocont == "0"] <- "Control" 
+new_data$casocont[new_data$casocont == "1"] <- "Casos" 
+people <- table(new_data$sexo, new_data$casocont)
+df <- data.frame(people)
+names(df) <- c("Sexo","Caso_control","Frequencia")
+df <- arrange(df, Caso_control, Sexo)
+df <- ddply(df, "Caso_control", transform, label_y=cumsum(Frequencia))
+#plot
+ggplot(data=df, aes(x=Caso_control, y=Frequencia, fill=Sexo)) + 
+    geom_bar(stat="identity") +
+    geom_text(aes(y=label_y, label=Frequencia), vjust=1.5, colour="white") +
+    labs(title = "Distribución por sexo", x = "Agudeza Visual", y = "Frecuencia") +
+    guides(fill=guide_legend(reverse=TRUE))
+```
+
+#Cajas y bigotes
+```{r}
+data_box <- data[,c("equivesf", "equivesfpostq", "casocont")]
+data_box$casocont[data_box$casocont == "0"] <- "Controles" 
+data_box$casocont[data_box$casocont == "1"] <- "Casos" 
+data_box$equivesf <- as.numeric(sub(",", ".", data_box$equivesf, fixed = TRUE))
+
+#cleanning data
+dataf1 <- data_box[,c("equivesf", "casocont")]
+dataf1$qx <- "PREQUIRURGICO" 
+names(dataf1) <- c("equivesf", "caso", "qx")
+dataf2 <- data_box[,c("equivesfpostq", "casocont")]
+dataf2$qx <- "POSQUIRURGICO" 
+names(dataf2) <- c("equivesf", "caso", "qx")
+new_data <- rbind(dataf1, dataf2)
+new_data$equivesf <- as.numeric(sub(",", ".", new_data$equivesf, fixed = TRUE))
+new_data$qx <- factor(new_data$qx, levels = c("PREQUIRURGICO", "POSQUIRURGICO"))
+
+ggplot(new_data, aes(x = factor(caso), y = equivesf)) + geom_boxplot(fill = "#F8766D", colour = "#000000") + facet_wrap(~ qx) + labs(title = "Distribución del Defecto Refractivo", x = "Agudeza Visual", y = "Equivalente Esférico") 
+```
+
+#Presión Intraocular
+```{r}
+data_box <- data[,c("pioccora", "tonometria", "casocont")]
+data_box$casocont[data_box$casocont == "0"] <- "Controles" 
+data_box$casocont[data_box$casocont == "1"] <- "Casos" 
+data_box$pioccora <- as.numeric(sub(",", ".", data_box$pioccora, fixed = TRUE))
+data_box$tonometria <- as.numeric(sub(",", ".", data_box$tonometria, fixed = TRUE))
+
+#cleanning data
+dataf1 <- data_box[,c("pioccora", "casocont")]
+dataf1$qx <- "PREQUIRURGICO" 
+names(dataf1) <- c("pio", "caso", "qx")
+dataf2 <- data_box[,c("tonometria", "casocont")]
+dataf2$qx <- "POSQUIRURGICO" 
+names(dataf2) <- c("pio", "caso", "qx")
+new_data <- rbind(dataf1, dataf2)
+data_box$pioccora <- as.numeric(sub(",", ".", data_box$pioccora, fixed = TRUE))
+data_box$tonometria <- as.numeric(sub(",", ".", data_box$tonometria, fixed = TRUE))
+new_data$qx <- factor(new_data$qx, levels = c("PREQUIRURGICO", "POSQUIRURGICO"))
+
+ggplot(new_data, aes(x = factor(caso), y = pio)) + geom_boxplot(fill = "#00BFC4", colour = "#000000") + facet_wrap(~ qx) + labs(title = "Distribución de la Presión Intraocular", x = "Agudeza Visual", y = "Presión Intraocular") 
+
+```
+
+#Matriz de correlaciones
+```{r}
+matrix_data <- data[,c("pioccora", "paquimetria", "ablacin", "equivesf", "chora", "kpd")]
+matrix_data$pioccora <- as.numeric(sub(",", ".", matrix_data$pioccora, fixed = TRUE))
+matrix_data$paquimetria <- as.numeric(sub(",", ".", matrix_data$paquimetria, fixed = TRUE))
+matrix_data$ablacin <- as.numeric(sub(",", ".", matrix_data$ablacin, fixed = TRUE))
+matrix_data$equivesf <- as.numeric(sub(",", ".", matrix_data$equivesf, fixed = TRUE))
+matrix_data$chora <- as.numeric(sub(",", ".", matrix_data$chora, fixed = TRUE))
+matrix_data$kpd <- as.numeric(sub(",", ".", matrix_data$kpd, fixed = TRUE))
+matrix_cor <- cor(matrix_data)
+corrplot(matrix_cor, method = "shade",shade.col=NA, tl.col="black", tl.srt=45)
+```
+
+#Regresión líneal Equivalente esférico vs edad agrupado por alergias
+```{r}
+title <- "Equivalente Esférico Posquirúrgico vs Edad por Alergia"
+x_lab <- "Edad"
+y_lab <- "Equivalente Esférico Posquirúrgico"
+ggplot(data, aes(x=edad, y=equivesfpostq, colour=factor(alergias))) + 
+    geom_point(size=3) +
+    labs(title = title, x = x_lab, y = y_lab, colour="Alergias") +
+    stat_smooth(method=lm)
+```
+
+
+library(MASS) # For the data set
+b <- biopsy
+b$classn[b$class=="benign"] <- 0
+b$classn[b$class=="malignant"] <- 1
+
+ggplot(b, aes(x=V1, y=classn)) +
+geom_point(position=position_jitter(width=0.3, height=0.06), alpha=0.4,
+shape=21, size=1.5) +
+stat_smooth(method=glm, family=binomial)
+
+
